@@ -9,6 +9,7 @@ public class ExtraConstants {
     public static final String OPEN_GL_VERSION = "open_gl_version";
     /* ExtraCore constant: When the microsoft authentication via webview is done */
     public static final String MICROSOFT_LOGIN_TODO = "webview_login_done";
+    public static final String ELYBY_LOGIN_TODO = "elyby_login_todo";
     /* ExtraCore constant: Mojang or "local" authentication to perform */
     public static final String MOJANG_LOGIN_TODO = "mojang_login_todo";
     /* ExtraCore constant: Add minecraft account procedure, the user has to select between mojang or microsoft */

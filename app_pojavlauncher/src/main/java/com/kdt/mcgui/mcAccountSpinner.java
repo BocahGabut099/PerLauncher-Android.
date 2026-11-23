@@ -38,6 +38,7 @@ import net.kdt.pojavlaunch.authenticator.listener.ErrorListener;
 import net.kdt.pojavlaunch.authenticator.listener.ProgressListener;
 import net.kdt.pojavlaunch.authenticator.microsoft.PresentedException;
 import net.kdt.pojavlaunch.authenticator.microsoft.MicrosoftBackgroundLogin;
+import net.kdt.pojavlaunch.authenticator.elyby.ElyByBackgroundLogin;
 import net.kdt.pojavlaunch.extra.ExtraConstants;
 import net.kdt.pojavlaunch.extra.ExtraCore;
 import net.kdt.pojavlaunch.extra.ExtraListener;
@@ -94,10 +95,15 @@ public class mcAccountSpinner extends AppCompatSpinner implements AdapterView.On
     private final DoneListener mDoneListener = account -> {
         Toast.makeText(getContext(), R.string.main_login_done, Toast.LENGTH_SHORT).show();
 
-        // Check if the account being added is not one that is already existing
-        // Like login twice on the same mc account...
-        for(String mcAccountName : mAccountList){
-            if(mcAccountName.equals(account.username)) return;
+        // If this account already exists (for example an offline profile upgraded to Ely.by),
+        // select the updated saved account instead of keeping the stale in-memory entry.
+        for (int i = 1; i < mAccountList.size(); i++) {
+            if (mAccountList.get(i).equals(account.username)) {
+                mSelectecAccount = account;
+                invalidate();
+                reloadAccounts(false, i);
+                return;
+            }
         }
 
         mSelectecAccount = account;
@@ -127,6 +133,19 @@ public class mcAccountSpinner extends AppCompatSpinner implements AdapterView.On
     private final ExtraListener<Uri> mMicrosoftLoginListener = (key, value) -> {
         mLoginBarPaint.setColor(getResources().getColor(R.color.minebutton_color));
         new MicrosoftBackgroundLogin(false, value.getQueryParameter("code")).performLogin(
+                mProgressListener, mDoneListener, mErrorListener);
+        return false;
+    };
+
+    /* Ely.by login: credentials are passed in-memory and are never saved by the launcher. */
+    private final ExtraListener<String[]> mElyByLoginListener = (key, value) -> {
+        if (value == null || value.length < 2) {
+            mErrorListener.onLoginError(new IllegalArgumentException("Data login Ely.by tidak lengkap."));
+            return false;
+        }
+        mLoginBarPaint.setColor(getResources().getColor(R.color.minebutton_color));
+        String totp = value.length > 2 ? value[2] : "";
+        new ElyByBackgroundLogin(value[0].trim(), value[1], totp).performLogin(
                 mProgressListener, mDoneListener, mErrorListener);
         return false;
     };
@@ -161,6 +180,7 @@ public class mcAccountSpinner extends AppCompatSpinner implements AdapterView.On
 
         ExtraCore.addExtraListener(ExtraConstants.MOJANG_LOGIN_TODO, mMojangLoginListener);
         ExtraCore.addExtraListener(ExtraConstants.MICROSOFT_LOGIN_TODO, mMicrosoftLoginListener);
+        ExtraCore.addExtraListener(ExtraConstants.ELYBY_LOGIN_TODO, mElyByLoginListener);
     }
 
 
@@ -289,6 +309,14 @@ public class mcAccountSpinner extends AppCompatSpinner implements AdapterView.On
             if(System.currentTimeMillis() > minecraftAccount.expiresAt){
                 // Perform login only if needed
                 new MicrosoftBackgroundLogin(true, minecraftAccount.msaRefreshToken)
+                        .performLogin(mProgressListener, mDoneListener, mErrorListener);
+            }
+            return;
+        }
+        if(minecraftAccount.isElyBy){
+            // Refresh shortly before expiry. A zero expiry means an older account file.
+            if(minecraftAccount.expiresAt <= System.currentTimeMillis() + 60000L){
+                new ElyByBackgroundLogin(minecraftAccount)
                         .performLogin(mProgressListener, mDoneListener, mErrorListener);
             }
             return;

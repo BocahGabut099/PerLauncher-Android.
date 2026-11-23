@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background_app"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="22dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Login Ely.by"
+            android:textColor="@android:color/white"
+            android:textSize="26sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:layout_marginBottom="20dp"
+            android:text="Kredensial dikirim langsung ke Ely.by melalui HTTPS. Password tidak disimpan oleh PerLauncher."
+            android:textColor="#B5B0C5"
+            android:textSize="13sp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Username atau email"
+            android:textColor="@android:color/white"
+            android:textSize="14sp" />
+        <com.kdt.mcgui.MineEditText
+            android:id="@+id/elyby_login_edit"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="6dp"
+            android:inputType="textEmailAddress"
+            android:singleLine="true" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Password"
+            android:textColor="@android:color/white"
+            android:textSize="14sp" />
+        <com.kdt.mcgui.MineEditText
+            android:id="@+id/elyby_password_edit"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="6dp"
+            android:inputType="textPassword"
+            android:singleLine="true" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Kode 2FA / Authenticator (opsional)"
+            android:textColor="@android:color/white"
+            android:textSize="14sp" />
+        <com.kdt.mcgui.MineEditText
+            android:id="@+id/elyby_totp_edit"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="6dp"
+            android:inputType="number"
+            android:maxLength="8"
+            android:singleLine="true" />
+
+        <com.kdt.mcgui.MineButton
+            android:id="@+id/elyby_login_button"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginTop="22dp"
+            android:text="Masuk dengan Ely.by" />
+
+        <com.kdt.mcgui.MineButton
+            android:id="@+id/elyby_register_button"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="10dp"
+            android:text="Buat akun Ely.by" />
+    </LinearLayout>
+</ScrollView>

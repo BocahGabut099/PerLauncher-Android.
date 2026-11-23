@@ -539,6 +539,12 @@ public final class Tools {
         }
         // We use a janky lwjgl setup. We don't want more people complaining it crashes.
         if (hasSodiumMod) javaArgList.add("-Dsodium.checks.issue2561=false");
+        if (minecraftAccount != null && minecraftAccount.isElyBy) {
+            File authlibInjector = net.kdt.pojavlaunch.authenticator.elyby.ElyByAuthlibInjector.ensureInstalled(activity);
+            javaArgList.add("-javaagent:" + authlibInjector.getAbsolutePath()
+                    + "=ely.by");
+            javaArgList.add("-Dauthlibinjector.noLogFile");
+        }
         javaArgList.add(versionInfo.mainClass);
         javaArgList.addAll(Arrays.asList(launchArgs));
         // ctx.appendlnToLog("full args: "+javaArgList.toString());
