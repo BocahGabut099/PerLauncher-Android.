@@ -129,7 +129,7 @@ public final class ElyByBackgroundLogin {
 
     private static long getJwtExpiresAt(String token) {
         try {
-            String[] parts = token.split("\.");
+            String[] parts = token.split("\\.");
             if (parts.length < 2) return 0L;
             byte[] bytes = Base64.decode(parts[1], Base64.URL_SAFE | Base64.NO_WRAP | Base64.NO_PADDING);
             JSONObject claims = new JSONObject(new String(bytes, StandardCharsets.UTF_8));
