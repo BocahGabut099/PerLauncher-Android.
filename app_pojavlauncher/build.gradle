@@ -122,8 +122,8 @@ android {
             shrinkResources false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             signingConfig signingConfigs.customDebug
-            resValue "string", "app_name", "PerLauncher (Debug)"
-            resValue "string", "app_short_name", "PerLauncher (Debug)"
+            resValue "string", "app_name", "PerLauncher"
+            resValue "string", "app_short_name", "PerLauncher"
             resValue 'string', 'application_package', 'org.angelauramc.amethyst.debug'
             resValue 'string', 'storageProviderAuthorities', 'org.angelauramc.amethyst.scoped.gamefolder.debug'
             resValue 'string', 'shareProviderAuthority', 'org.angelauramc.amethyst.scoped.controlfolder.debug'
