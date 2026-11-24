@@ -137,16 +137,14 @@ public class mcAccountSpinner extends AppCompatSpinner implements AdapterView.On
         return false;
     };
 
-    /* Ely.by login: credentials are passed in-memory and are never saved by the launcher. */
+    /* Ely.by OAuth login: password handling stays on Ely.by's official WebView. */
     private final ExtraListener<String[]> mElyByLoginListener = (key, value) -> {
-        if (value == null || value.length < 2) {
-            mErrorListener.onLoginError(new IllegalArgumentException("Data login Ely.by tidak lengkap."));
+        if (value == null || value.length < 5) {
+            mErrorListener.onLoginError(new IllegalArgumentException("Data OAuth Ely.by tidak lengkap."));
             return false;
         }
         mLoginBarPaint.setColor(getResources().getColor(R.color.minebutton_color));
-        String totp = value.length > 2 ? value[2] : "";
-        new ElyByBackgroundLogin(value[0].trim(), value[1], totp).performLogin(
-                mProgressListener, mDoneListener, mErrorListener);
+        new ElyByBackgroundLogin(value).performLogin(mProgressListener, mDoneListener, mErrorListener);
         return false;
     };
 

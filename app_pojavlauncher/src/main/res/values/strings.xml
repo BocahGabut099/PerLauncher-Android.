@@ -518,11 +518,8 @@
     <string name="use_angle_checkbox">Use ANGLE (might help FPS)</string>
 
 
-    <string name="login_elyby_account">Akun Ely.by</string>
-    <string name="login_elyby_username_hint">Username atau email Ely.by</string>
-    <string name="login_elyby_password_hint">Password Ely.by</string>
-    <string name="login_elyby_totp_hint">Kode 2FA / Authenticator (opsional)</string>
-    <string name="login_elyby_submit">Masuk dengan Ely.by</string>
-    <string name="login_elyby_register">Buat akun Ely.by</string>
-    <string name="login_elyby_bad_credentials">Masukkan username/email dan password Ely.by yang valid.</string>
+
+
+
+
 </resources>

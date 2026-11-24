@@ -28,6 +28,7 @@ public class MinecraftAccount {
     public boolean isMicrosoft = false;
     public boolean isElyBy = false;
     public String msaRefreshToken = "0";
+    public String elyByRefreshToken = ""; // OAuth refresh token; never an Ely.by password
     public String xuid;
     public long expiresAt;
     public String skinFaceBase64;
@@ -92,6 +93,22 @@ public class MinecraftAccount {
             }
             if (acc.msaRefreshToken == null) {
                 acc.msaRefreshToken = "0";
+            }
+            if (acc.elyByRefreshToken == null) {
+                acc.elyByRefreshToken = "";
+            }
+
+            // Migrate OAuth refresh tokens saved by older PerLauncher builds.
+            if (acc.isElyBy && (acc.elyByRefreshToken.isEmpty() || "0".equals(acc.elyByRefreshToken))
+                    && acc.msaRefreshToken != null && !acc.msaRefreshToken.isEmpty()
+                    && !"0".equals(acc.msaRefreshToken)) {
+                acc.elyByRefreshToken = acc.msaRefreshToken;
+                acc.msaRefreshToken = "0";
+                try {
+                    acc.save();
+                } catch (IOException migrationError) {
+                    Log.e(MinecraftAccount.class.getName(), "Could not persist Ely.by token migration", migrationError);
+                }
             }
             return acc;
         } catch(NullPointerException | IOException | JsonSyntaxException e) {

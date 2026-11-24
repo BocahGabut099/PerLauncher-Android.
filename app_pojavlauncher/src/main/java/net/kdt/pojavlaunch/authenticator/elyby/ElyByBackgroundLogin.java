@@ -2,7 +2,6 @@ package net.kdt.pojavlaunch.authenticator.elyby;
 
 import static net.kdt.pojavlaunch.PojavApplication.sExecutorService;
 
-import android.util.Base64;
 import android.util.Log;
 
 import androidx.annotation.Nullable;
@@ -27,31 +26,32 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
-/** Ely.by's documented Yggdrasil-compatible login and token refresh flow. */
+/** Handles Ely.by OAuth sessions and refreshes without collecting Ely.by passwords. */
 public final class ElyByBackgroundLogin {
-    private static final String AUTH_URL = "https://authserver.ely.by";
-    private static final int TIMEOUT_MS = 25000;
+    private static final String WORKER_URL = "https://auth.bchgabuttt.my.id";
+    private static final String LEGACY_AUTH_URL = "https://authserver.ely.by";
+    private static final int TIMEOUT_MS = 20000;
 
-    private final boolean refreshMode;
-    private final String username;
-    private final String password;
-    private final String totp;
     private final MinecraftAccount existingAccount;
+    private final String[] oauthData;
+    private final boolean refreshMode;
 
-    public ElyByBackgroundLogin(String username, String password, String totp) {
-        this.refreshMode = false;
-        this.username = username;
-        this.password = password;
-        this.totp = totp == null ? "" : totp.trim();
+    /** OAuth payload: access token, refresh token, username, UUID, expires_in seconds. */
+    public ElyByBackgroundLogin(String[] oauthData) {
+        if (oauthData == null || oauthData.length < 5) {
+            throw new IllegalArgumentException("Data OAuth Ely.by tidak lengkap.");
+        }
+        this.oauthData = oauthData.clone();
         this.existingAccount = null;
+        this.refreshMode = false;
     }
 
+    /** Refresh an already-saved Ely.by account. */
     public ElyByBackgroundLogin(MinecraftAccount account) {
-        this.refreshMode = true;
+        if (account == null || !account.isElyBy) throw new IllegalArgumentException("Akun Ely.by tidak valid.");
         this.existingAccount = account;
-        this.username = null;
-        this.password = null;
-        this.totp = null;
+        this.oauthData = null;
+        this.refreshMode = true;
     }
 
     public void performLogin(@Nullable ProgressListener progressListener,
@@ -60,89 +60,121 @@ public final class ElyByBackgroundLogin {
         sExecutorService.execute(() -> {
             try {
                 notifyProgress(progressListener, 1);
-                JSONObject response = refreshMode ? refresh() : authenticate();
+                JSONObject response = refreshMode ? refresh() : createOAuthResponse(oauthData);
                 notifyProgress(progressListener, 4);
                 MinecraftAccount account = buildAccount(response);
                 account.save();
                 notifyProgress(progressListener, 5);
-                if (doneListener != null) {
-                    Tools.runOnUiThread(() -> doneListener.onLoginDone(account));
-                }
+                if (doneListener != null) Tools.runOnUiThread(() -> doneListener.onLoginDone(account));
             } catch (Exception error) {
-                Log.e("PerLauncherElyBy", "Ely.by authentication failed", error);
-                if (errorListener != null) {
-                    Tools.runOnUiThread(() -> errorListener.onLoginError(error));
-                }
+                Log.e("PerLauncherElyBy", "Ely.by OAuth authentication failed", error);
+                if (errorListener != null) Tools.runOnUiThread(() -> errorListener.onLoginError(error));
             } finally {
                 ProgressLayout.clearProgress(ProgressLayout.AUTHENTICATE_MICROSOFT);
             }
         });
     }
 
-    private JSONObject authenticate() throws IOException, JSONException {
-        JSONObject request = new JSONObject();
-        request.put("username", username);
-        request.put("password", totp.isEmpty() ? password : password + ":" + totp);
-        request.put("clientToken", UUID.randomUUID().toString());
-        request.put("requestUser", true);
-        JSONObject agent = new JSONObject();
-        agent.put("name", "Minecraft");
-        agent.put("version", 1);
-        request.put("agent", agent);
-        return postJson("/auth/authenticate", request);
+    private JSONObject createOAuthResponse(String[] values) throws JSONException, IOException {
+        JSONObject response = new JSONObject();
+        response.put("access_token", values[0]);
+        response.put("refresh_token", values[1]);
+        response.put("expires_in", parseExpires(values[4]));
+        JSONObject user = new JSONObject();
+        user.put("username", values[2]);
+        user.put("uuid", values[3]);
+        response.put("user", user);
+        return response;
     }
 
     private JSONObject refresh() throws IOException, JSONException {
+        String refreshToken = existingAccount.elyByRefreshToken;
+        if (refreshToken == null || refreshToken.trim().isEmpty() || "0".equals(refreshToken)) {
+            // Existing installations may still contain a pre-OAuth Yggdrasil token.
+            return refreshLegacyToken();
+        }
+        JSONObject request = new JSONObject();
+        request.put("refresh_token", refreshToken);
+        JSONObject response = postJson(WORKER_URL + "/refresh", request);
+        if (!response.has("refresh_token")) response.put("refresh_token", refreshToken);
+        return response;
+    }
+
+    private JSONObject refreshLegacyToken() throws IOException, JSONException {
         JSONObject request = new JSONObject();
         request.put("accessToken", existingAccount.accessToken);
         request.put("clientToken", existingAccount.clientToken);
         request.put("requestUser", true);
-        return postJson("/auth/refresh", request);
+        JSONObject legacy = postJson(LEGACY_AUTH_URL + "/auth/refresh", request);
+        JSONObject selected = legacy.getJSONObject("selectedProfile");
+        JSONObject user = new JSONObject();
+        user.put("username", selected.getString("name"));
+        user.put("uuid", normalizeUuid(selected.getString("id")));
+        JSONObject normalized = new JSONObject();
+        normalized.put("access_token", legacy.getString("accessToken"));
+        normalized.put("refresh_token", "");
+        normalized.put("expires_in", getJwtExpiresIn(legacy.getString("accessToken")));
+        normalized.put("user", user);
+        normalized.put("legacy_client_token", legacy.optString("clientToken", existingAccount.clientToken));
+        return normalized;
     }
 
     private MinecraftAccount buildAccount(JSONObject response) throws JSONException, IOException {
-        JSONObject selected = response.getJSONObject("selectedProfile");
-        String name = selected.getString("name");
-        MinecraftAccount account = MinecraftAccount.load(name);
+        String accessToken = response.optString("access_token", "");
+        JSONObject user = response.optJSONObject("user");
+        if (accessToken.isEmpty() || user == null) throw new IOException("Respons Ely.by tidak berisi token atau profil.");
+        String username = user.optString("username", "");
+        String uuid = normalizeUuid(user.optString("uuid", ""));
+        if (!username.matches("[A-Za-z0-9_]{3,16}")) throw new IOException("Username Ely.by tidak valid.");
+        if (!uuid.matches("(?i)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")) {
+            throw new IOException("UUID profil Ely.by tidak valid.");
+        }
+
+        MinecraftAccount account = MinecraftAccount.load(username);
         if (account == null) account = new MinecraftAccount();
         if (account.isMicrosoft) {
-            throw new IOException("Akun dengan nama yang sama sudah tersimpan sebagai akun Microsoft. Hapus akun duplikat tersebut lalu coba lagi.");
+            throw new IOException("Nama akun ini sudah tersimpan sebagai akun Microsoft. Ganti nama profil atau hapus duplikatnya.");
         }
-        account.username = name;
-        account.profileId = normalizeUuid(selected.getString("id"));
-        account.accessToken = response.getString("accessToken");
-        account.clientToken = response.optString("clientToken", account.clientToken);
+        account.username = username;
+        account.profileId = uuid;
+        account.accessToken = accessToken;
+        account.clientToken = response.optString("legacy_client_token",
+                existingAccount != null ? existingAccount.clientToken : UUID.randomUUID().toString());
         account.isMicrosoft = false;
         account.isElyBy = true;
         account.msaRefreshToken = "0";
         account.xuid = null;
-        account.expiresAt = getJwtExpiresAt(account.accessToken);
+        account.elyByRefreshToken = response.optString("refresh_token", "");
+        long expiresIn = response.optLong("expires_in", 86400L);
+        account.expiresAt = System.currentTimeMillis() + Math.max(60L, expiresIn) * 1000L - 30000L;
         return account;
     }
 
+    private static long parseExpires(String value) throws IOException {
+        try {
+            long parsed = Long.parseLong(value);
+            if (parsed < 60L || parsed > 31536000L) throw new NumberFormatException("range");
+            return parsed;
+        } catch (NumberFormatException error) {
+            throw new IOException("Masa berlaku token Ely.by tidak valid.", error);
+        }
+    }
+
     private static String normalizeUuid(String uuid) {
-        String raw = uuid.replace("-", "");
-        if (raw.length() != 32) return uuid;
+        String raw = uuid == null ? "" : uuid.replace("-", "");
+        if (!raw.matches("(?i)[0-9a-f]{32}")) return uuid == null ? "" : uuid;
         return raw.substring(0, 8) + "-" + raw.substring(8, 12) + "-" + raw.substring(12, 16)
                 + "-" + raw.substring(16, 20) + "-" + raw.substring(20);
     }
 
-    private static long getJwtExpiresAt(String token) {
-        try {
-            String[] parts = token.split("\\.");
-            if (parts.length < 2) return 0L;
-            byte[] bytes = Base64.decode(parts[1], Base64.URL_SAFE | Base64.NO_WRAP | Base64.NO_PADDING);
-            JSONObject claims = new JSONObject(new String(bytes, StandardCharsets.UTF_8));
-            long exp = claims.optLong("exp", 0L);
-            return exp > 0 ? exp * 1000L : 0L;
-        } catch (Exception ignored) {
-            return 0L;
-        }
+    private static long getJwtExpiresIn(String token) {
+        // Legacy Ely.by tokens are refreshed through their own refresh endpoint.
+        return 3600L;
     }
 
-    private JSONObject postJson(String endpoint, JSONObject payload) throws IOException, JSONException {
+    private static JSONObject postJson(String target, JSONObject payload) throws IOException, JSONException {
         byte[] body = payload.toString().getBytes(StandardCharsets.UTF_8);
-        HttpURLConnection connection = (HttpURLConnection) new URL(AUTH_URL + endpoint).openConnection();
+        HttpURLConnection connection = (HttpURLConnection) new URL(target).openConnection();
         connection.setRequestMethod("POST");
         connection.setConnectTimeout(TIMEOUT_MS);
         connection.setReadTimeout(TIMEOUT_MS);
@@ -153,28 +185,21 @@ public final class ElyByBackgroundLogin {
         connection.setRequestProperty("Accept", "application/json");
         connection.setRequestProperty("User-Agent", "PerLauncher-Android");
         try {
-            try (OutputStream output = connection.getOutputStream()) {
-                output.write(body);
-            }
+            try (OutputStream output = connection.getOutputStream()) { output.write(body); }
             int status = connection.getResponseCode();
-            InputStream stream = status >= 200 && status < 300
-                    ? connection.getInputStream() : connection.getErrorStream();
-            String responseText = stream == null ? "" : readFully(stream);
+            InputStream stream = status >= 200 && status < 300 ? connection.getInputStream() : connection.getErrorStream();
+            String text = stream == null ? "" : readFully(stream);
             if (status < 200 || status >= 300) {
-                String message = connection.getResponseMessage();
+                String message = "HTTP " + status;
                 try {
-                    JSONObject error = new JSONObject(responseText);
-                    message = error.optString("errorMessage", error.optString("error", message));
+                    JSONObject error = new JSONObject(text);
+                    message = error.optString("error", error.optString("error_description", error.optString("message", message)));
                 } catch (JSONException ignored) {
-                    if (!responseText.isEmpty()) message = responseText;
+                    if (!text.isEmpty()) message = text;
                 }
-                if (message != null && message.toLowerCase(java.util.Locale.ROOT).contains("two factor")
-                        && totp != null && totp.isEmpty()) {
-                    message = "Akun Ely.by memakai verifikasi 2 langkah. Masukkan kode TOTP/Authenticator lalu coba lagi.";
-                }
-                throw new IOException("Ely.by (HTTP " + status + "): " + message);
+                throw new IOException("Ely.by: " + message);
             }
-            return new JSONObject(responseText);
+            return new JSONObject(text);
         } finally {
             connection.disconnect();
         }

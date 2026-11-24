@@ -38,6 +38,7 @@ import net.kdt.pojavlaunch.extra.ExtraCore;
 import net.kdt.pojavlaunch.extra.ExtraListener;
 import net.kdt.pojavlaunch.fragments.MainMenuFragment;
 import net.kdt.pojavlaunch.fragments.MicrosoftLoginFragment;
+import net.kdt.pojavlaunch.fragments.ElyByLoginFragment;
 import net.kdt.pojavlaunch.fragments.SelectAuthFragment;
 import net.kdt.pojavlaunch.lifecycle.ContextAwareDoneListener;
 import net.kdt.pojavlaunch.lifecycle.ContextExecutor;
@@ -391,6 +392,12 @@ public class LauncherActivity extends BaseActivity {
                 fragment.goBack();
                 return;
             }
+        }
+
+        ElyByLoginFragment elyByFragment = (ElyByLoginFragment) getVisibleFragment(ElyByLoginFragment.TAG);
+        if (elyByFragment != null && elyByFragment.canGoBack()) {
+            elyByFragment.goBack();
+            return;
         }
 
         // Check if we are at the root then
