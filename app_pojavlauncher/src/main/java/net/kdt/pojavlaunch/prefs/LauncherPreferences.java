@@ -154,16 +154,18 @@ public class LauncherPreferences {
      */
     private static int findBestRAMAllocation(Context ctx){
         int deviceRam = Tools.getTotalDeviceMemory(ctx);
-        if (deviceRam < 1024) return 296;
-        if (deviceRam < 1536) return 448;
-        if (deviceRam < 2048) return 656;
-        // Limit the max for 32 bits devices more harshly
-        if (is32BitsDevice()) return 696;
 
-        if (deviceRam < 3064) return 936;
-        if (deviceRam < 4096) return 1144;
-        if (deviceRam < 6144) return 1536;
-        return 2048; //Default RAM allocation for 64 bits
+        // Conservative defaults: leave enough memory for Android and the launcher.
+        // Values are MiB and are only used when the user has not set a custom value.
+        if (deviceRam < 1536) return 448;
+        if (deviceRam < 2560) return 640;   // 2 GB class devices
+        if (deviceRam < 3584) return 832;   // 3 GB class devices
+        if (deviceRam < 4608) return 1024;  // 4 GB class devices
+        if (deviceRam < 6144) return 1280;  // 6 GB class devices
+
+        // Keep 32-bit processes conservative even on devices with more physical RAM.
+        if (is32BitsDevice()) return 696;
+        return 1536;
     }
 
     /// Find a correct resolution for the device
@@ -173,7 +175,13 @@ public class LauncherPreferences {
     private static int findBestResolution(Context context, boolean isDevicePowerful) {
         DisplayMetrics metrics = context.getResources().getDisplayMetrics();
         int minSide = Math.min(metrics.widthPixels, metrics.heightPixels);
-        int targetSide = isDevicePowerful ? 1080 : 720;
+        int deviceRam = Tools.getTotalDeviceMemory(context);
+        // Lower render resolution by default on low-memory devices; users can still change it.
+        int targetSide;
+        if (deviceRam < 2560) targetSide = 540;
+        else if (deviceRam < 3584) targetSide = 600;
+        else if (deviceRam < 4608) targetSide = 720;
+        else targetSide = isDevicePowerful ? 1080 : 900;
         if (minSide <= targetSide) return 100; // No need to scale down
 
         float ratio = (100f * targetSide / minSide);
