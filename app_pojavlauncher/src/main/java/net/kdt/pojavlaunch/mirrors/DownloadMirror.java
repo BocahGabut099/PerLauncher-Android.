@@ -131,7 +131,22 @@ public class DownloadMirror {
         }
     }
 
+    private static final String MAVEN_CENTRAL_MIRROR =
+            "https://download.dcache.org/nexus/repository/central";
+
     private static String getMirrorMapping(int downloadClass, String mojangUrl) throws MalformedURLException{
+        // Route Maven Central downloads through the reachable DCache mirror.
+        // This also applies to .sha1 requests, preserving library verification.
+        String repo1Prefix = "https://repo1.maven.org/maven2/";
+        String repoApachePrefix = "https://repo.maven.apache.org/maven2/";
+
+        if (mojangUrl.startsWith(repo1Prefix)) {
+            return MAVEN_CENTRAL_MIRROR + mojangUrl.substring(repo1Prefix.length() - 1);
+        }
+        if (mojangUrl.startsWith(repoApachePrefix)) {
+            return MAVEN_CENTRAL_MIRROR + mojangUrl.substring(repoApachePrefix.length() - 1);
+        }
+
         String[] mirrorSettings = getMirrorSettings();
         if(mirrorSettings == null) return mojangUrl;
         int urlTail = getBaseUrlTail(mojangUrl);
