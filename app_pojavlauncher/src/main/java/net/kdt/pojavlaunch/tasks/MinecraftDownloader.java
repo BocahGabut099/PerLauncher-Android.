@@ -81,12 +81,15 @@ public class MinecraftDownloader {
 
         } else {
             isLocalProfile = true;
+            // Background installation must attempt the download.
+            // Connectivity failures will be reported by the downloader.
+            isOnline = true;
             Tools.switchDemo(true);
         }
 
         sExecutorService.execute(() -> {
             try {
-                if(isLocalProfile || !isOnline) {
+                if(!isOnline) {
                     String versionMessage = realVersion; // Use provided version unless we find its a modded instance
 
                     // See if provided version is a modded version and if that version depends on another jar, check for presence of both jar's .json.
