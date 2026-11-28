@@ -39,6 +39,32 @@ jobs:
           branch: buildjre8
           name: jre8-pojav
 
+      - name: Set up Android NDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'ndk;27.3.13750724'
+
+      - name: Set up Rust Android targets
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk --locked
+
+      - name: Build Rust Android JNI bridge
+        working-directory: rust-engine
+        shell: bash
+        run: |
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/27.3.13750724"
+          test -d "$ANDROID_NDK_HOME"
+          cargo ndk -P 21 -t arm64-v8a -t armeabi-v7a -t x86 -t x86_64 \
+            -o ../app_pojavlauncher/build/rustJniLibs \
+            build --release -p perlauncher-android
+          for abi in arm64-v8a armeabi-v7a x86 x86_64; do
+            test -s "../app_pojavlauncher/build/rustJniLibs/$abi/libperlauncher_engine.so"
+          done
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
